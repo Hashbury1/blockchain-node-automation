@@ -1,0 +1,100 @@
+---
+- name: Deploy Blockchain Nodes on Kubernetes
+  hosts: local
+  gather_facts: yes
+  vars:
+    node_type: "{{ node_type | default('geth') }}"
+    k8s_manifests_dir: "../k8s"
+    monitoring_enabled: true
+
+  tasks:
+    - name: Display deployment information
+      debug:
+        msg: "Deploying {{ node_type }} node(s) to Kubernetes cluster"
+
+    - name: Check if k3d cluster exists
+      shell: k3d cluster list | grep blockchain-lab
+      register: cluster_check
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Create k3d cluster if not exists
+      shell: |
+        k3d cluster create blockchain-lab \
+          --agents 2 \
+          --port "8545:30545@loadbalancer" \
+          --port "8332:30332@loadbalancer" \
+          --port "3000:30000@loadbalancer"
+      when: cluster_check.rc != 0
+
+    - name: Wait for cluster to be ready
+      shell: kubectl get nodes
+      register: nodes_ready
+      until: nodes_ready.rc == 0
+      retries: 10
+      delay: 5
+      changed_when: false
+
+    - name: Add Prometheus Helm repository
+      shell: |
+        helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+        helm repo update
+      when: monitoring_enabled
+
+    - name: Deploy monitoring stack
+      shell: |
+        kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+        helm upgrade --install prometheus prometheus-community/kube-prometheus-stack \
+          --namespace monitoring \
+          --values {{ k8s_manifests_dir }}/monitoring/prometheus-values.yaml \
+          --wait
+      when: monitoring_enabled
+      register: monitoring_deploy
+      changed_when: "'deployed' in monitoring_deploy.stdout"
+
+    - name: Deploy Geth node
+      shell: kubectl apply -f {{ k8s_manifests_dir }}/geth/
+      when: node_type == 'geth' or node_type == 'all'
+      register: geth_deploy
+      changed_when: "'created' in geth_deploy.stdout or 'configured' in geth_deploy.stdout"
+
+    - name: Deploy Bitcoin node
+      shell: kubectl apply -f {{ k8s_manifests_dir }}/bitcoin/
+      when: node_type == 'bitcoin' or node_type == 'all'
+      register: bitcoin_deploy
+      changed_when: "'created' in bitcoin_deploy.stdout or 'configured' in bitcoin_deploy.stdout"
+
+    - name: Wait for Geth pod to be ready
+      shell: kubectl wait --for=condition=ready pod -l app=geth -n eth-nodes --timeout=300s
+      when: node_type == 'geth' or node_type == 'all'
+      ignore_errors: yes
+
+    - name: Wait for Bitcoin pod to be ready
+      shell: kubectl wait --for=condition=ready pod -l app=bitcoin -n btc-nodes --timeout=300s
+      when: node_type == 'bitcoin' or node_type == 'all'
+      ignore_errors: yes
+
+    - name: Get Grafana admin password
+      shell: kubectl get secret -n monitoring prometheus-grafana -o jsonpath="{.data.admin-password}" | base64 --decode
+      register: grafana_password
+      when: monitoring_enabled
+      changed_when: false
+
+    - name: Display access information
+      debug:
+        msg:
+          - "=========================================="
+          - "Deployment Complete!"
+          - "=========================================="
+          - "Grafana Dashboard: http://localhost:3000"
+          - "  Username: admin"
+          - "  Password: {{ grafana_password.stdout | default('prom-operator') }}"
+          - ""
+          - "Prometheus: http://localhost:9090"
+          - ""
+          - "{% if node_type == 'geth' or node_type == 'all' %}Geth RPC: http://localhost:8545{% endif %}"
+          - "{% if node_type == 'bitcoin' or node_type == 'all' %}Bitcoin RPC: http://localhost:8332{% endif %}"
+          - ""
+          - "Check pod status: kubectl get pods -A"
+          - "View logs: kubectl logs -f <pod-name> -n <namespace>"
+          - "=========================================="

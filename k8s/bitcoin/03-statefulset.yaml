@@ -1,0 +1,106 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: bitcoin-node
+  namespace: btc-nodes
+  labels:
+    app: bitcoin
+    network: testnet
+spec:
+  serviceName: bitcoin
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bitcoin
+  template:
+    metadata:
+      labels:
+        app: bitcoin
+        network: testnet
+    spec:
+      containers:
+      - name: bitcoin
+        image: ruimarinho/bitcoin-core:latest
+        command: ["bitcoind"]
+        args:
+          - -conf=/bitcoin/.bitcoin/bitcoin.conf
+          - -datadir=/bitcoin/.bitcoin
+          - -printtoconsole
+        ports:
+        - name: rpc
+          containerPort: 18332
+          protocol: TCP
+        - name: p2p
+          containerPort: 18333
+          protocol: TCP
+        env:
+        - name: BITCOIN_DATA
+          value: /bitcoin/.bitcoin
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "500m"
+          limits:
+            memory: "4Gi"
+            cpu: "1500m"
+        volumeMounts:
+        - name: bitcoin-data
+          mountPath: /bitcoin/.bitcoin
+        - name: bitcoin-config
+          mountPath: /bitcoin/.bitcoin/bitcoin.conf
+          subPath: bitcoin.conf
+        livenessProbe:
+          exec:
+            command:
+            - bitcoin-cli
+            - -testnet
+            - -rpcuser=bitcoin
+            - -rpcpassword=bitcoinpass123
+            - getblockchaininfo
+          initialDelaySeconds: 120
+          periodSeconds: 60
+          timeoutSeconds: 30
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - bitcoin-cli
+            - -testnet
+            - -rpcuser=bitcoin
+            - -rpcpassword=bitcoinpass123
+            - getblockchaininfo
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 15
+          failureThreshold: 3
+      # Bitcoin Prometheus Exporter
+      - name: bitcoin-exporter
+        image: jvstein/bitcoin-prometheus-exporter:latest
+        ports:
+        - name: metrics
+          containerPort: 9332
+          protocol: TCP
+        env:
+        - name: BITCOIN_RPC_HOST
+          value: "localhost"
+        - name: BITCOIN_RPC_PORT
+          value: "18332"
+        - name: BITCOIN_RPC_USER
+          value: "bitcoin"
+        - name: BITCOIN_RPC_PASSWORD
+          value: "bitcoinpass123"
+        resources:
+          requests:
+            memory: "32Mi"
+            cpu: "25m"
+          limits:
+            memory: "64Mi"
+            cpu: "50m"
+      volumes:
+      - name: bitcoin-data
+        persistentVolumeClaim:
+          claimName: bitcoin-data-pvc
+      - name: bitcoin-config
+        configMap:
+          name: bitcoin-config
+      restartPolicy: Always
