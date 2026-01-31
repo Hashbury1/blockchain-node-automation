@@ -1,0 +1,121 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: geth-node
+  namespace: eth-nodes
+  labels:
+    app: geth
+    network: sepolia
+spec:
+  serviceName: geth
+  replicas: 1
+  selector:
+    matchLabels:
+      app: geth
+  template:
+    metadata:
+      labels:
+        app: geth
+        network: sepolia
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "6060"
+        prometheus.io/path: "/debug/metrics/prometheus"
+    spec:
+      containers:
+      - name: geth
+        image: ethereum/client-go:latest
+        args:
+          - --sepolia
+          - --syncmode=snap
+          - --http
+          - --http.addr=0.0.0.0
+          - --http.port=8545
+          - --http.api=eth,net,web3,debug
+          - --http.corsdomain=*
+          - --http.vhosts=*
+          - --ws
+          - --ws.addr=0.0.0.0
+          - --ws.port=8546
+          - --ws.api=eth,net,web3
+          - --ws.origins=*
+          - --metrics
+          - --metrics.addr=0.0.0.0
+          - --metrics.port=6060
+          - --cache=2048
+          - --maxpeers=50
+        ports:
+        - name: http-rpc
+          containerPort: 8545
+          protocol: TCP
+        - name: ws-rpc
+          containerPort: 8546
+          protocol: TCP
+        - name: metrics
+          containerPort: 6060
+          protocol: TCP
+        - name: p2p
+          containerPort: 30303
+          protocol: TCP
+        - name: p2p-udp
+          containerPort: 30303
+          protocol: UDP
+        env:
+        - name: GETH_CACHE
+          valueFrom:
+            configMapKeyRef:
+              name: geth-config
+              key: CACHE
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "1000m"
+          limits:
+            memory: "6Gi"
+            cpu: "2000m"
+        volumeMounts:
+        - name: geth-data
+          mountPath: /root/.ethereum
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8545
+            httpHeaders:
+            - name: Content-Type
+              value: application/json
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8545
+            httpHeaders:
+            - name: Content-Type
+              value: application/json
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      # Fluent Bit sidecar for log shipping
+      - name: fluent-bit
+        image: fluent/fluent-bit:latest
+        volumeMounts:
+        - name: fluent-bit-config
+          mountPath: /fluent-bit/etc/
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+      volumes:
+      - name: geth-data
+        persistentVolumeClaim:
+          claimName: geth-data-pvc
+      - name: fluent-bit-config
+        configMap:
+          name: fluent-bit-config
+      restartPolicy: Always
