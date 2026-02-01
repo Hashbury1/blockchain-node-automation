@@ -308,4 +308,4 @@ After completing this guide, you should have:
 - [ ] Understanding of basic kubectl commands
 - [ ] Logs accessible for debugging
 
-Congratulations! You now have a fully functional blockchain node infrastructure! 🎉
+Congratulations! You now have a fully functional blockchain node infrastructure. 
