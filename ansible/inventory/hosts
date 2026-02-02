@@ -1,0 +1,6 @@
+# Before (caused warnings):
+[local]
+localhost ansible_connection=local
+
+# After (clean):
+localhost ansible_connection=local ansible_python_interpreter=/usr/bin/python3
