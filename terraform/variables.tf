@@ -8,7 +8,7 @@ variable "environment" {
   description = "Environment name (dev, staging, prod)"
   type        = string
   default     = "dev"
-  
+
   validation {
     condition     = contains(["dev", "staging", "prod"], var.environment)
     error_message = "Environment must be dev, staging, or prod."
@@ -36,7 +36,7 @@ variable "vpc_cidr" {
 variable "node_instance_types" {
   description = "EC2 instance types for EKS nodes"
   type        = list(string)
-  default     = ["t3.large"]  # 2 vCPU, 8GB RAM - good for blockchain nodes
+  default     = ["t3.large"] # 2 vCPU, 8GB RAM - good for blockchain nodes
 }
 
 variable "node_group_min_size" {
@@ -60,7 +60,7 @@ variable "node_group_desired_size" {
 variable "allowed_rpc_cidrs" {
   description = "CIDR blocks allowed to access RPC endpoints"
   type        = list(string)
-  default     = ["0.0.0.0/0"]  # WARNING: Restrict this in production!
+  default     = ["0.0.0.0/0"] # WARNING: Restrict this in production!
 }
 
 variable "enable_monitoring" {
