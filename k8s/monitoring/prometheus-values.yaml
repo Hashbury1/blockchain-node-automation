@@ -11,13 +11,6 @@ prometheus:
       limits:
         cpu: 500m
         memory: 1Gi
-    storageSpec:
-      volumeClaimTemplate:
-        spec:
-          accessModes: ["ReadWriteOnce"]
-          resources:
-            requests:
-              storage: 10Gi
 
 grafana:
   enabled: true
@@ -30,28 +23,8 @@ grafana:
       cpu: 200m
       memory: 256Mi
   persistence:
-    enabled: true
-    size: 5Gi
-  datasources:
-    datasources.yaml:
-      apiVersion: 1
-      datasources:
-      - name: Prometheus
-        type: prometheus
-        url: http://prometheus-kube-prometheus-prometheus:9090
-        isDefault: true
-  dashboardProviders:
-    dashboardproviders.yaml:
-      apiVersion: 1
-      providers:
-      - name: 'default'
-        orgId: 1
-        folder: ''
-        type: file
-        disableDeletion: false
-        editable: true
-        options:
-          path: /var/lib/grafana/dashboards/default
+    enabled: false
+  defaultDashboardsEnabled: true
 
 alertmanager:
   enabled: true
