@@ -1,0 +1,43 @@
+# terraform.tfvars - Example Configuration
+# Copy this file to terraform.tfvars and customize for your deployment
+# DO NOT commit terraform.tfvars to git (it's in .gitignore)
+
+# AWS Configuration
+region      = "us-east-1"
+environment = "dev"  # dev, staging, or prod
+
+# Cluster Configuration
+cluster_name       = "blockchain-node-cluster"
+kubernetes_version = "1.28"
+
+# Network Configuration
+vpc_cidr = "10.0.0.0/16"
+
+# Node Group Configuration
+node_instance_types     = ["t3.large"]  # 2 vCPU, 8GB RAM
+node_group_min_size     = 1
+node_group_max_size     = 3
+node_group_desired_size = 2
+
+# Security
+allowed_rpc_cidrs = ["0.0.0.0/0"]  # WARNING: Restrict this in production!
+# allowed_rpc_cidrs = ["YOUR_IP/32"]  # Recommended: Only your IP
+
+# Storage
+geth_storage_size    = 100  # GB
+bitcoin_storage_size = 150  # GB
+
+# Applications
+deploy_geth    = true
+deploy_bitcoin = false
+
+# Monitoring
+enable_monitoring = true
+grafana_admin_password = "changeme123!"  # CHANGE THIS!
+
+# Tags
+tags = {
+  Owner       = "your-name"
+  Purpose     = "blockchain-node-automation"
+  CostCenter  = "engineering"
+}
